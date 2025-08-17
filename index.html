@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Psychedelic Animation Generator</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+        }
+        canvas {
+            display: block;
+            margin: 20px auto;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+        .controls {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px;
+            width: 80%;
+            max-width: 600px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .control-group {
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+        input[type="range"], select, input[type="color"] {
+            width: 100%;
+        }
+        .color-pickers {
+            grid-column: span 2;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .color-picker {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .color-picker label {
+            margin-bottom: 5px;
+        }
+        button {
+            background: linear-gradient(45deg, #ff00ff, #00ffff);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .download-container {
+            margin: 20px;
+            text-align: center;
+        }
+        h1 {
+            text-align: center;
+            background: linear-gradient(45deg, #ff00ff, #00ffff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Psychedelic Animation Generator</h1>
+    
+    <canvas id="psychedelicCanvas"></canvas>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label for="patternType">Pattern Type</label>
+            <select id="patternType">
+                <option value="circles">Pulsing Circles</option>
+                <option value="waves">Radiating Waves</option>
+                <option value="spiral">Hypnotic Spiral</option>
+                <option value="grid">Warping Grid</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label for="speed">Animation Speed</label>
+            <input type="range" id="speed" min="0.1" max="5" step="0.1" value="1">
+        </div>
+        
+        <div class="control-group">
+            <label for="colorSpeed">Color Change Speed</label>
+            <input type="range" id="colorSpeed" min="0.1" max="5" step="0.1" value="1">
+        </div>
+        
+        <div class="control-group">
+            <label for="complexity">Pattern Complexity</label>
+            <input type="range" id="complexity" min="1" max="10" step="1" value="5">
+        </div>
+        
+        <div class="control-group">
+            <label for="size">Element Size</label>
+            <input type="range" id="size" min="5" max="50" step="1" value="20">
+        </div>
+        
+        <div class="control-group">
+            <label for="brightness">Brightness</label>
+            <input type="range" id="brightness" min="50" max="200" step="10" value="100">
+        </div>
+        
+        <div class="color-pickers">
+            <div class="color-picker">
+                <label for="color1">Primary Color</label>
+                <input type="color" id="color1" value="#ff00ff">
+            </div>
+            <div class="color-picker">
+                <label for="color2">Secondary Color</label>
+                <input type="color" id="color2" value="#00ffff">
+            </div>
+            <div class="color-picker">
+                <label for="color3">Accent Color</label>
+                <input type="color" id="color3" value="#ff9900">
+            </div>
+        </div>
+    </div>
+    
+    <div class="download-container">
+        <button id="downloadBtn">Download Animation (7s)</button>
+        <div id="countdown" style="display: none; margin-top: 10px;">Preparing download... 7</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('psychedelicCanvas');
+        const ctx = canvas.getContext('2d');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const countdown = document.getElementById('countdown');
+        
+        // Set canvas size
+        function resizeCanvas() {
+            const size = Math.min(window.innerWidth - 40, 800);
+            canvas.width = size;
+            canvas.height = size;
+        }
+        
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Animation variables
+        let time = 0;
+        let hue = 0;
+        let frames = [];
+        let isRecording = false;
+        let frameCount = 0;
+        let countdownInterval;
+        
+        // Get control values
+        function getControls() {
+            return {
+                patternType: document.getElementById('patternType').value,
+                speed: parseFloat(document.getElementById('speed').value),
+                colorSpeed: parseFloat(document.getElementById('colorSpeed').value),
+                complexity: parseInt(document.getElementById('complexity').value),
+                size: parseInt(document.getElementById('size').value),
+                brightness: parseInt(document.getElementById('brightness').value) / 100,
+                color1: document.getElementById('color1').value,
+                color2: document.getElementById('color2').value,
+                color3: document.getElementById('color3').value
+            };
+        }
+        
+        // Convert hex color to HSL
+        function hexToHSL(hex) {
+            // Convert hex to RGB first
+            let r = 0, g = 0, b = 0;
+            if (hex.length == 4) {
+                r = parseInt(hex[1] + hex[1], 16);
+                g = parseInt(hex[2] + hex[2], 16);
+                b = parseInt(hex[3] + hex[3], 16);
+            } else if (hex.length == 7) {
+                r = parseInt(hex[1] + hex[2], 16);
+                g = parseInt(hex[3] + hex[4], 16);
+                b = parseInt(hex[5] + hex[6], 16);
+            }
+            
+            // Then convert RGB to HSL
+            r /= 255;
+            g /= 255;
+            b /= 255;
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            let h, s, l = (max + min) / 2;
+
+            if (max == min) {
+                h = s = 0; // achromatic
+            } else {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+
+            return [h * 360, s * 100, l * 100];
+        }
+        
+        // Get interpolated color based on time
+        function getDynamicColor(time, colors) {
+            const [h1, s1, l1] = hexToHSL(colors[0]);
+            const [h2, s2, l2] = hexToHSL(colors[1]);
+            const [h3, s3, l3] = hexToHSL(colors[2]);
+            
+            // Create a smooth transition between colors based on time
+            const t = (Math.sin(time * 0.5) * 0.5 + 0.5; // Oscillates between 0 and 1
+            
+            if (t < 0.5) {
+                const t2 = t * 2;
+                const h = h1 + (h2 - h1) * t2;
+                const s = s1 + (s2 - s1) * t2;
+                const l = l1 + (l2 - l1) * t2;
+                return `hsl(${h}, ${s}%, ${l}%)`;
+            } else {
+                const t2 = (t - 0.5) * 2;
+                const h = h2 + (h3 - h2) * t2;
+                const s = s2 + (s3 - s2) * t2;
+                const l = l2 + (l3 - l2) * t2;
+                return `hsl(${h}, ${s}%, ${l}%)`;
+            }
+        }
+        
+        // Draw psychedelic pattern
+        function draw() {
+            const { patternType, speed, colorSpeed, complexity, size, brightness, color1, color2, color3 } = getControls();
+            const colors = [color1, color2, color3];
+            
+            time += 0.01 * speed;
+            hue = (hue + 0.5 * colorSpeed) % 360;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+            
+            if (patternType === 'circles') {
+                // Pulsing circles pattern
+                for (let i = 0; i < complexity * 5; i++) {
+                    const radius = size * 5 + Math.sin(time + i) * size * 4;
+                    const alpha = brightness * (0.5 + 0.5 * Math.sin(time * 0.5 + i * 0.2));
+                    ctx.strokeStyle = getDynamicColor(time + i * 0.1, colors);
+                    ctx.globalAlpha = alpha;
+                    ctx.lineWidth = 2 + Math.sin(time * 0.3 + i) * 1.5;
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            } else if (patternType === 'waves') {
+                // Radiating waves pattern
+                for (let i = 0; i < complexity * 20; i++) {
+                    const angle = (i / (complexity * 20)) * Math.PI * 2;
+                    const distance = (size * 2) + Math.sin(time * 2 + i * 0.1) * size * 1.5;
+                    const x = centerX + Math.cos(angle) * distance;
+                    const y = centerY + Math.sin(angle) * distance;
+                    const radius = size * 0.5 + Math.sin(time + i * 0.2) * size * 0.3;
+                    const alpha = brightness * (0.7 + 0.3 * Math.sin(time * 0.7 + i * 0.1));
+                    ctx.fillStyle = getDynamicColor(time + i * 0.05, colors);
+                    ctx.globalAlpha = alpha;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            } else if (patternType === 'spiral') {
+                // Hypnotic spiral pattern
+                const spiralTurns = complexity * 2;
+                const points = 200;
+                ctx.lineWidth = size * 0.3;
+                
+                for (let j = 0; j < 3; j++) {
+                    ctx.beginPath();
+                    for (let i = 0; i < points; i++) {
+                        const progress = i / points;
+                        const angle = progress * Math.PI * 2 * spiralTurns + time * (j + 1);
+                        const radius = progress * (canvas.width / 2 - size);
+                        const x = centerX + Math.cos(angle) * radius;
+                        const y = centerY + Math.sin(angle) * radius;
+                        
+                        if (i === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    }
+                    const alpha = brightness * (0.7 + 0.3 * Math.sin(time * 0.5 + j));
+                    ctx.strokeStyle = getDynamicColor(time + j * 0.3, colors);
+                    ctx.globalAlpha = alpha;
+                    ctx.stroke();
+                }
+            } else if (patternType === 'grid') {
+                // Warping grid pattern
+                const cellSize = size * 2;
+                const cols = Math.ceil(canvas.width / cellSize) + 1;
+                const rows = Math.ceil(canvas.height / cellSize) + 1;
+                
+                for (let i = 0; i < cols; i++) {
+                    for (let j = 0; j < rows; j++) {
+                        const x = i * cellSize + Math.sin(time + j * 0.2) * size * 0.5;
+                        const y = j * cellSize + Math.cos(time + i * 0.2) * size * 0.5;
+                        const s = size * 0.3 + Math.sin(time + i + j) * size * 0.2;
+                        const alpha = brightness * (0.5 + 0.5 * Math.sin(time * 0.3 + i + j));
+                        ctx.fillStyle = getDynamicColor(time + (i + j) * 0.02, colors);
+                        ctx.globalAlpha = alpha;
+                        ctx.fillRect(x, y, s, s);
+                    }
+                }
+            }
+            
+            // Reset global alpha
+            ctx.globalAlpha = 1.0;
+            
+            if (isRecording && frameCount < 7 * 60) { // 7 seconds at 60fps
+                frames.push(canvas.toDataURL('image/png'));
+                frameCount++;
+            }
+            
+            requestAnimationFrame(draw);
+        }
+        
+        // Start animation
+        draw();
+        
+        // Download functionality
+        downloadBtn.addEventListener('click', () => {
+            if (isRecording) return;
+            
+            // Reset recording state
+            frames = [];
+            frameCount = 0;
+            isRecording = true;
+            downloadBtn.disabled = true;
+            countdown.style.display = 'block';
+            
+            // Start countdown
+            let seconds = 7;
+            countdown.textContent = `Preparing download... ${seconds}`;
+            
+            countdownInterval = setInterval(() => {
+                seconds--;
+                countdown.textContent = `Preparing download... ${seconds}`;
+                
+                if (seconds <= 0) {
+                    clearInterval(countdownInterval);
+                    createAndDownloadGif();
+                }
+            }, 1000);
+        });
+        
+        function createAndDownloadGif() {
+            // For a real implementation, you would use a GIF encoder library like gif.js
+            // This is a simplified version that just downloads the current frame
+            
+            // In a production environment, you would:
+            // 1. Collect all frames during the recording period
+            // 2. Use gif.js or similar to create an animated GIF
+            // 3. Download the resulting GIF
+            
+            // For this example, we'll just download the current canvas as PNG
+            const link = document.createElement('a');
+            link.download = 'psychedelic-art.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            
+            // Reset UI
+            isRecording = false;
+            downloadBtn.disabled = false;
+            countdown.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
