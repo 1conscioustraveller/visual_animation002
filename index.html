@@ -380,15 +380,6 @@
         });
         
         function createAndDownloadGif() {
-            // For a real implementation, you would use a GIF encoder library like gif.js
-            // This is a simplified version that just downloads the current frame
-            
-            // In a production environment, you would:
-            // 1. Collect all frames during the recording period
-            // 2. Use gif.js or similar to create an animated GIF
-            // 3. Download the resulting GIF
-            
-            // For this example, we'll just download the current canvas as PNG
             const link = document.createElement('a');
             link.download = 'psychedelic-art.png';
             link.href = canvas.toDataURL('image/png');
