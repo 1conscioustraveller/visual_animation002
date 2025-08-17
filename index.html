@@ -46,18 +46,13 @@
             grid-column: span 2;
             display: flex;
             justify-content: space-between;
-            gap: 10px;
+            gap: 15px;
         }
         .color-picker {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .color-picker label {
-            margin-bottom: 5px;
+            flex: 1;
         }
         button {
-            background: linear-gradient(45deg, #ff00ff, #00ffff);
+            background: linear-gradient(45deg, var(--color1, #ff00ff), var(--color2, #00ffff));
             border: none;
             color: white;
             padding: 10px 20px;
@@ -81,7 +76,7 @@
         }
         h1 {
             text-align: center;
-            background: linear-gradient(45deg, #ff00ff, #00ffff);
+            background: linear-gradient(45deg, var(--color1, #ff00ff), var(--color2, #00ffff));
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
@@ -95,6 +90,17 @@
     <canvas id="psychedelicCanvas"></canvas>
     
     <div class="controls">
+        <div class="color-pickers">
+            <div class="color-picker control-group">
+                <label for="color1">Primary Color</label>
+                <input type="color" id="color1" value="#ff00ff">
+            </div>
+            <div class="color-picker control-group">
+                <label for="color2">Secondary Color</label>
+                <input type="color" id="color2" value="#00ffff">
+            </div>
+        </div>
+        
         <div class="control-group">
             <label for="patternType">Pattern Type</label>
             <select id="patternType">
@@ -129,21 +135,6 @@
             <label for="brightness">Brightness</label>
             <input type="range" id="brightness" min="50" max="200" step="10" value="100">
         </div>
-        
-        <div class="color-pickers">
-            <div class="color-picker">
-                <label for="color1">Primary Color</label>
-                <input type="color" id="color1" value="#ff00ff">
-            </div>
-            <div class="color-picker">
-                <label for="color2">Secondary Color</label>
-                <input type="color" id="color2" value="#00ffff">
-            </div>
-            <div class="color-picker">
-                <label for="color3">Accent Color</label>
-                <input type="color" id="color3" value="#ff9900">
-            </div>
-        </div>
     </div>
     
     <div class="download-container">
@@ -156,6 +147,8 @@
         const ctx = canvas.getContext('2d');
         const downloadBtn = document.getElementById('downloadBtn');
         const countdown = document.getElementById('countdown');
+        const color1Input = document.getElementById('color1');
+        const color2Input = document.getElementById('color2');
         
         // Set canvas size
         function resizeCanvas() {
@@ -166,6 +159,16 @@
         
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
+        
+        // Update CSS variables when colors change
+        function updateColors() {
+            document.documentElement.style.setProperty('--color1', color1Input.value);
+            document.documentElement.style.setProperty('--color2', color2Input.value);
+        }
+        
+        color1Input.addEventListener('input', updateColors);
+        color2Input.addEventListener('input', updateColors);
+        updateColors();
         
         // Animation variables
         let time = 0;
@@ -178,84 +181,40 @@
         // Get control values
         function getControls() {
             return {
+                color1: color1Input.value,
+                color2: color2Input.value,
                 patternType: document.getElementById('patternType').value,
                 speed: parseFloat(document.getElementById('speed').value),
                 colorSpeed: parseFloat(document.getElementById('colorSpeed').value),
                 complexity: parseInt(document.getElementById('complexity').value),
                 size: parseInt(document.getElementById('size').value),
-                brightness: parseInt(document.getElementById('brightness').value) / 100,
-                color1: document.getElementById('color1').value,
-                color2: document.getElementById('color2').value,
-                color3: document.getElementById('color3').value
+                brightness: parseInt(document.getElementById('brightness').value) / 100
             };
         }
         
-        // Convert hex color to HSL
-        function hexToHSL(hex) {
-            // Convert hex to RGB first
-            let r = 0, g = 0, b = 0;
-            if (hex.length == 4) {
-                r = parseInt(hex[1] + hex[1], 16);
-                g = parseInt(hex[2] + hex[2], 16);
-                b = parseInt(hex[3] + hex[3], 16);
-            } else if (hex.length == 7) {
-                r = parseInt(hex[1] + hex[2], 16);
-                g = parseInt(hex[3] + hex[4], 16);
-                b = parseInt(hex[5] + hex[6], 16);
-            }
-            
-            // Then convert RGB to HSL
-            r /= 255;
-            g /= 255;
-            b /= 255;
-            const max = Math.max(r, g, b);
-            const min = Math.min(r, g, b);
-            let h, s, l = (max + min) / 2;
-
-            if (max == min) {
-                h = s = 0; // achromatic
-            } else {
-                const d = max - min;
-                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-                switch (max) {
-                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-                    case g: h = (b - r) / d + 2; break;
-                    case b: h = (r - g) / d + 4; break;
-                }
-                h /= 6;
-            }
-
-            return [h * 360, s * 100, l * 100];
+        // Convert hex to RGB
+        function hexToRgb(hex) {
+            const r = parseInt(hex.substring(1, 3), 16);
+            const g = parseInt(hex.substring(3, 5), 16);
+            const b = parseInt(hex.substring(5, 7), 16);
+            return { r, g, b };
         }
         
-        // Get interpolated color based on time
-        function getDynamicColor(time, colors) {
-            const [h1, s1, l1] = hexToHSL(colors[0]);
-            const [h2, s2, l2] = hexToHSL(colors[1]);
-            const [h3, s3, l3] = hexToHSL(colors[2]);
+        // Interpolate between two colors
+        function interpolateColor(color1, color2, factor) {
+            const rgb1 = hexToRgb(color1);
+            const rgb2 = hexToRgb(color2);
             
-            // Create a smooth transition between colors based on time
-            const t = (Math.sin(time * 0.5) * 0.5 + 0.5; // Oscillates between 0 and 1
+            const r = Math.round(rgb1.r + factor * (rgb2.r - rgb1.r));
+            const g = Math.round(rgb1.g + factor * (rgb2.g - rgb1.g));
+            const b = Math.round(rgb1.b + factor * (rgb2.b - rgb1.b));
             
-            if (t < 0.5) {
-                const t2 = t * 2;
-                const h = h1 + (h2 - h1) * t2;
-                const s = s1 + (s2 - s1) * t2;
-                const l = l1 + (l2 - l1) * t2;
-                return `hsl(${h}, ${s}%, ${l}%)`;
-            } else {
-                const t2 = (t - 0.5) * 2;
-                const h = h2 + (h3 - h2) * t2;
-                const s = s2 + (s3 - s2) * t2;
-                const l = l2 + (l3 - l2) * t2;
-                return `hsl(${h}, ${s}%, ${l}%)`;
-            }
+            return `rgb(${r}, ${g}, ${b})`;
         }
         
         // Draw psychedelic pattern
         function draw() {
-            const { patternType, speed, colorSpeed, complexity, size, brightness, color1, color2, color3 } = getControls();
-            const colors = [color1, color2, color3];
+            const { color1, color2, patternType, speed, colorSpeed, complexity, size, brightness } = getControls();
             
             time += 0.01 * speed;
             hue = (hue + 0.5 * colorSpeed) % 360;
@@ -272,8 +231,9 @@
                 for (let i = 0; i < complexity * 5; i++) {
                     const radius = size * 5 + Math.sin(time + i) * size * 4;
                     const alpha = brightness * (0.5 + 0.5 * Math.sin(time * 0.5 + i * 0.2));
-                    ctx.strokeStyle = getDynamicColor(time + i * 0.1, colors);
-                    ctx.globalAlpha = alpha;
+                    const colorFactor = (Math.sin(time * 0.3 + i * 0.1) + 1) / 2;
+                    ctx.strokeStyle = interpolateColor(color1, color2, colorFactor);
+                    ctx.strokeStyle += ` ${alpha})`.replace('rgb', 'rgba');
                     ctx.lineWidth = 2 + Math.sin(time * 0.3 + i) * 1.5;
                     ctx.beginPath();
                     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -288,8 +248,9 @@
                     const y = centerY + Math.sin(angle) * distance;
                     const radius = size * 0.5 + Math.sin(time + i * 0.2) * size * 0.3;
                     const alpha = brightness * (0.7 + 0.3 * Math.sin(time * 0.7 + i * 0.1));
-                    ctx.fillStyle = getDynamicColor(time + i * 0.05, colors);
-                    ctx.globalAlpha = alpha;
+                    const colorFactor = (i % 10) / 10;
+                    ctx.fillStyle = interpolateColor(color1, color2, colorFactor);
+                    ctx.fillStyle += ` ${alpha})`.replace('rgb', 'rgba');
                     ctx.beginPath();
                     ctx.arc(x, y, radius, 0, Math.PI * 2);
                     ctx.fill();
@@ -316,8 +277,9 @@
                         }
                     }
                     const alpha = brightness * (0.7 + 0.3 * Math.sin(time * 0.5 + j));
-                    ctx.strokeStyle = getDynamicColor(time + j * 0.3, colors);
-                    ctx.globalAlpha = alpha;
+                    const colorFactor = j / 3;
+                    ctx.strokeStyle = interpolateColor(color1, color2, colorFactor);
+                    ctx.strokeStyle += ` ${alpha})`.replace('rgb', 'rgba');
                     ctx.stroke();
                 }
             } else if (patternType === 'grid') {
@@ -332,15 +294,13 @@
                         const y = j * cellSize + Math.cos(time + i * 0.2) * size * 0.5;
                         const s = size * 0.3 + Math.sin(time + i + j) * size * 0.2;
                         const alpha = brightness * (0.5 + 0.5 * Math.sin(time * 0.3 + i + j));
-                        ctx.fillStyle = getDynamicColor(time + (i + j) * 0.02, colors);
-                        ctx.globalAlpha = alpha;
+                        const colorFactor = (Math.sin(time * 0.2 + i * 0.1 + j * 0.1) + 1) / 2;
+                        ctx.fillStyle = interpolateColor(color1, color2, colorFactor);
+                        ctx.fillStyle += ` ${alpha})`.replace('rgb', 'rgba');
                         ctx.fillRect(x, y, s, s);
                     }
                 }
             }
-            
-            // Reset global alpha
-            ctx.globalAlpha = 1.0;
             
             if (isRecording && frameCount < 7 * 60) { // 7 seconds at 60fps
                 frames.push(canvas.toDataURL('image/png'));
@@ -380,6 +340,15 @@
         });
         
         function createAndDownloadGif() {
+            // For a real implementation, you would use a GIF encoder library like gif.js
+            // This is a simplified version that just downloads the current frame
+            
+            // In a production environment, you would:
+            // 1. Collect all frames during the recording period
+            // 2. Use gif.js or similar to create an animated GIF
+            // 3. Download the resulting GIF
+            
+            // For this example, we'll just download the current canvas as PNG
             const link = document.createElement('a');
             link.download = 'psychedelic-art.png';
             link.href = canvas.toDataURL('image/png');
